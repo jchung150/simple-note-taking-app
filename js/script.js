@@ -51,7 +51,7 @@ class AppManager {
 
   addNoteCard() {
     const newNoteCard = new NoteCard(this.nextId++);
-    newNoteCard.render();
+    newNoteCard.renderWriter();
     localStorage.setItem("nextId", this.nextId);
   }
 
@@ -93,10 +93,19 @@ class AppManager {
       }
     }
     notes.sort((a, b) => a.id - b.id);
+    const isWriterPage = document.getElementById("card-container") !== null;
+    const isReaderPage =
+      document.getElementById("read-card-container") !== null;
+
     notes.forEach((noteData) => {
       const loadedNote = new NoteCard(noteData.id);
       loadedNote.updateText(noteData.text);
-      loadedNote.render();
+
+      if (isWriterPage) {
+        loadedNote.renderWriter();
+      } else if (isReaderPage) {
+        loadedNote.renderReader();
+      }
     });
   }
 }
@@ -104,6 +113,8 @@ class AppManager {
 class StorageManager {
   static saveNoteToStorage(note) {
     localStorage.setItem(note.id, JSON.stringify(note));
+    const currentTime = StorageManager.getCurrentTime();
+    localStorage.setItem("lastSavedTime", currentTime);
     StorageManager.displaySavedTime();
     console.log(`Note ${note.id} saved at ${StorageManager.getCurrentTime()}`);
   }
@@ -115,14 +126,16 @@ class StorageManager {
 
   static displaySavedTime() {
     const savedTimeDisplay = document.getElementById("saved-time-display");
+    const lastSavedTime =
+      localStorage.getItem("lastSavedTime") || StorageManager.getCurrentTime();
 
     if (savedTimeDisplay) {
-      savedTimeDisplay.innerHTML = `Saved at: ${StorageManager.getCurrentTime()}`;
+      savedTimeDisplay.innerHTML = `Saved at: ${lastSavedTime}`;
     } else {
       const savedTime = document.createElement("div");
       savedTime.className = "saved-time";
       savedTime.id = "saved-time-display";
-      savedTime.innerHTML = `<p>Saved at: ${StorageManager.getCurrentTime()}</p>`;
+      savedTime.innerHTML = `<p>Saved at: ${lastSavedTime}</p>`;
 
       const timeContainer = document.getElementById("time-container");
       timeContainer.appendChild(savedTime);
@@ -139,7 +152,7 @@ class NoteCard {
     this.text = "";
   }
 
-  render() {
+  renderWriter() {
     const card = document.createElement("div");
     card.className = "card mb-4 shadow-sm";
     card.setAttribute("data-note-id", this.id);
@@ -169,11 +182,49 @@ class NoteCard {
 
     noteElement.appendChild(inputElement);
     noteElement.appendChild(buttonElement);
-
     card.appendChild(noteElement);
 
     const cardContainer = document.getElementById("card-container");
     cardContainer.appendChild(card);
+  }
+
+  renderReader() {
+    const card = document.createElement("div");
+    card.className = "card mb-4 shadow-sm";
+    card.setAttribute("data-note-id", this.id);
+
+    const noteElement = document.createElement("div");
+    noteElement.className = "card-body";
+    noteElement.id = `note-${this.id}`;
+
+    const textElement = document.createElement("p");
+    textElement.className = "form-control mb-3";
+    textElement.innerText = this.text;
+
+    noteElement.appendChild(textElement);
+
+    card.appendChild(noteElement);
+
+    const readCardContainer = document.getElementById("read-card-container");
+    if (readCardContainer) {
+      readCardContainer.appendChild(card);
+    }
+
+    const savedTimeDisplay = document.createElement("div");
+    savedTimeDisplay.className = "saved-time mt-2";
+    const updatedTimeContainer = document.getElementById(
+      "updated-time-container"
+    );
+
+    const refreshSavedTime = () => {
+      const lastSavedTime = localStorage.getItem("lastSavedTime");
+      savedTimeDisplay.textContent = `Updated at: ${lastSavedTime}`;
+    };
+
+    refreshSavedTime();
+    setInterval(refreshSavedTime, 2000);
+
+    updatedTimeContainer.appendChild(savedTimeDisplay);
   }
 
   updateText(newText) {
