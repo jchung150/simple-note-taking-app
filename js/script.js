@@ -36,6 +36,101 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+class AppManager {
+  constructor(currentPage, id) {
+    this.currentPage = currentPage;
+    this.id = id;
+  }
+  initializePage() {
+    if (!localStoreage) {
+      StorageManager.loadFromStorage();
+    } else {
+      const noteCards = new NoteCards();
+      return;
+    }
+  }
+  handleAutoSave(interval) {}
+  handleAutoLoad(interval) {}
+  stopAutoSave() {}
+}
+
+class StorageManaer {
+  // saveToStorage(notes)
+  // loadFromStorage()
+  // removeFromStorage(id)
+  // getCurrentTime()
+  getCurrentTime() {
+    const d = new Date();
+    const hour = d.getHours();
+    const minute = d.getMinutes().toString().padStart(2, "0");
+    const second = d.getSeconds().toString().padStart(2, "0");
+    // return `<p>Stored at: ${hour}:${minute}:${second}</p>`;
+  }
+}
+
+class NoteCard {
+  constructor(id, text) {
+    this.id = id;
+    this.text = text;
+  }
+
+  render() {
+    const noteElement = document.createElement("div");
+    noteElement.className = "note-card";
+    noteElement.id = `${this.id}`;
+
+    noteElement.innerHTML = `<p>${this.text}</p>`;
+
+    const textAreaElement = document.getElementById("text-area");
+    textAreaElement.appendChild(noteElement);
+  }
+
+  updateText(newText) {}
+}
+
+class NoteCards {
+  constructor() {
+    this.noteCards = [];
+    this.nextId = 0;
+    this.loadNotes();
+    document
+      .getElementById("add-btn")
+      .addEventListener("click", () => this.addNote());
+  }
+
+  addNote() {
+    const inputElement = document.getElementById("user-input");
+    const text = inputElement ? inputElement.value.trim() : "";
+
+    if (text !== "") {
+      const newNote = new NoteCard(this.nextId++, text);
+      newNote.render();
+      this.noteCards.push(newNote); // add new noteCard obj to the array
+      this.saveAllNotes();
+    }
+  }
+
+  saveAllNotes() {
+    localStorage.setItem("notes", JSON.stringify(this.noteCards));
+  }
+
+  loadNotes() {
+    const storedNoteCards = JSON.parse(localStorage.getItem("notes"));
+    if (storedNoteCards && storedNoteCards.length > 0) {
+      storedNoteCards.forEach((storedNote) => {
+        const loadedNote = new NoteCard(storedNote.id, storedNote.text);
+        this.noteCards.push(loadedNote);
+        loadedNote.render();
+      });
+    }
+  }
+
+  // addNote(text)
+  // loadNotes()
+  // saveAllNotes()
+  // removeNote(id)
+}
+
 // App Manager - handles the page lifecycle
 // Properties:
 // - currentPage: (string)
