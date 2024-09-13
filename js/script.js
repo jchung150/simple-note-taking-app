@@ -87,17 +87,38 @@ class AppManager {
     const newNote = new Note(this.nextId++);
     newNote.renderWritePage();
     StorageManager.saveNextIdToStorage(this.nextId);
+
+    // Save the updated notes array immediately
+    this.saveAllNotes();
   }
 
+  // addNote() {
+  //   const newNote = new Note(this.nextId++);
+  //   newNote.renderWritePage();
+  //   StorageManager.saveNextIdToStorage(this.nextId);
+  // }
+
   saveAllNotes() {
-    document.querySelectorAll(".card").forEach((note) => {
-      const newNoteId = parseInt(note.dataset.noteId); // Get the correct noteId
-      const newNoteText = note.querySelector("input").value;
-      const newNote = new Note(newNoteId);
-      newNote.updateText(newNoteText);
-      StorageManager.saveNoteToStorage(newNote);
+    const notesArray = [];
+    document.querySelectorAll(".card").forEach((noteElement) => {
+      const noteId = parseInt(noteElement.dataset.noteId);
+      const noteText = noteElement.querySelector("input").value;
+      const note = new Note(noteId);
+      note.updateText(noteText);
+      notesArray.push(note);
     });
+    StorageManager.saveNotesArrayToStorage(notesArray);
   }
+
+  // saveAllNotes() {
+  //   document.querySelectorAll(".card").forEach((note) => {
+  //     const newNoteId = parseInt(note.dataset.noteId); // Get the correct noteId
+  //     const newNoteText = note.querySelector("input").value;
+  //     const newNote = new Note(newNoteId);
+  //     newNote.updateText(newNoteText);
+  //     StorageManager.saveNoteToStorage(newNote);
+  //   });
+  // }
 
   //remove all notes from the DOM
   removeAllNotes() {
@@ -109,34 +130,63 @@ class AppManager {
   loadAllNotes() {
     this.removeAllNotes();
 
+    // Update nextId from localStorage
     this.nextId = parseInt(localStorage.getItem("nextId")) || 0;
 
-    if (localStorage.length === 0) {
+    const notesArray = StorageManager.getNotesArrayFromStorage();
+
+    if (notesArray.length === 0) {
       console.log("No notes. Skipping load.");
       return;
     }
 
-    for (let id = 0; id < this.nextId; id++) {
-      const noteData = localStorage.getItem(id);
+    notesArray.forEach((noteData) => {
+      const loadedNote = new Note(noteData.id);
+      loadedNote.updateText(noteData.text);
 
-      // If the note with the current ID exists, process it
-      if (noteData) {
-        const parsedNote = JSON.parse(noteData);
-        const loadedNote = new Note(parsedNote.id);
-        loadedNote.updateText(parsedNote.text);
+      const isWriterPage = document.getElementById("card-container") !== null;
+      const isReaderPage =
+        document.getElementById("read-card-container") !== null;
 
-        const isWriterPage = document.getElementById("card-container") !== null;
-        const isReaderPage =
-          document.getElementById("read-card-container") !== null;
-
-        if (isWriterPage) {
-          loadedNote.renderWritePage();
-        } else if (isReaderPage) {
-          loadedNote.renderReadPage();
-        }
+      if (isWriterPage) {
+        loadedNote.renderWritePage();
+      } else if (isReaderPage) {
+        loadedNote.renderReadPage();
       }
-    }
+    });
   }
+
+  // loadAllNotes() {
+  //   this.removeAllNotes();
+
+  //   this.nextId = parseInt(localStorage.getItem("nextId")) || 0;
+
+  //   if (localStorage.length === 0) {
+  //     console.log("No notes. Skipping load.");
+  //     return;
+  //   }
+
+  //   for (let id = 0; id < this.nextId; id++) {
+  //     const noteData = localStorage.getItem(id);
+
+  //     // If the note with the current ID exists, process it
+  //     if (noteData) {
+  //       const parsedNote = JSON.parse(noteData);
+  //       const loadedNote = new Note(parsedNote.id);
+  //       loadedNote.updateText(parsedNote.text);
+
+  //       const isWriterPage = document.getElementById("card-container") !== null;
+  //       const isReaderPage =
+  //         document.getElementById("read-card-container") !== null;
+
+  //       if (isWriterPage) {
+  //         loadedNote.renderWritePage();
+  //       } else if (isReaderPage) {
+  //         loadedNote.renderReadPage();
+  //       }
+  //     }
+  //   }
+  // }
 
   displaySavedTime() {
     const savedTimeDisplay = document.getElementById("saved-time-display");
@@ -177,24 +227,49 @@ class AppManager {
 }
 
 class StorageManager {
-  static saveNoteToStorage(note) {
-    localStorage.setItem(note.id, JSON.stringify(note));
+  static saveNotesArrayToStorage(notesArray) {
+    localStorage.setItem("notesArray", JSON.stringify(notesArray));
+  }
+
+  static getNotesArrayFromStorage() {
+    const notesData = localStorage.getItem("notesArray");
+    return notesData ? JSON.parse(notesData) : [];
   }
 
   static saveNextIdToStorage(nextId) {
     localStorage.setItem("nextId", nextId);
   }
 
-  static removeFromStorage(id) {
-    localStorage.removeItem(id);
-    console.log(`Note ${id} removed from localStorage`);
+  static removeNoteFromStorage(noteId) {
+    let notesArray = StorageManager.getNotesArrayFromStorage();
+    notesArray = notesArray.filter((note) => note.id !== noteId);
+    StorageManager.saveNotesArrayToStorage(notesArray);
   }
 
   static removeAllFromStorage() {
-    localStorage.clear();
+    localStorage.removeItem("notesArray");
     localStorage.removeItem("nextId");
     console.log("All notes removed from localStorage");
   }
+
+  // static saveNoteToStorage(note) {
+  //   localStorage.setItem(note.id, JSON.stringify(note));
+  // }
+
+  // static saveNextIdToStorage(nextId) {
+  //   localStorage.setItem("nextId", nextId);
+  // }
+
+  // static removeFromStorage(id) {
+  //   localStorage.removeItem(id);
+  //   console.log(`Note ${id} removed from localStorage`);
+  // }
+
+  // static removeAllFromStorage() {
+  //   localStorage.clear();
+  //   localStorage.removeItem("nextId");
+  //   console.log("All notes removed from localStorage");
+  // }
 }
 class Note {
   constructor(id) {
@@ -257,10 +332,18 @@ class Note {
   remove() {
     const card = document.querySelector(`[data-note-id="${this.id}"]`);
     if (card) {
-      card.remove(); // this only removes the note from DOM
-      StorageManager.removeFromStorage(this.id);
+      card.remove(); // Remove from DOM
+      StorageManager.removeNoteFromStorage(this.id); // Remove from localStorage
     }
   }
+
+  // remove() {
+  //   const card = document.querySelector(`[data-note-id="${this.id}"]`);
+  //   if (card) {
+  //     card.remove(); // this only removes the note from DOM
+  //     StorageManager.removeFromStorage(this.id);
+  //   }
+  // }
 }
 
 const appManager = new AppManager();
