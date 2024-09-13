@@ -1,5 +1,4 @@
-const time = {
-  interval: 2,
+const messages = {
+  savedAt: "Saved at: ",
+  updatedAt: "Updated at: ",
 };
-
-const messages = {};

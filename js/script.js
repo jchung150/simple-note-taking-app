@@ -39,84 +39,150 @@ window.addEventListener("DOMContentLoaded", () => {
 class AppManager {
   constructor() {
     this.nextId = parseInt(localStorage.getItem("nextId")) || 0;
-    this.loadNotes();
-    this.handleAutoSave();
+    this.autoSaveInterval = null;
+    this.autoLoadInterval = null;
+
+    this.loadAllNotes();
+    this.autoSave();
+    this.autoLoad();
   }
 
-  handleAutoSave() {
-    setInterval(() => {
+  getCurrentTime() {
+    return new Date().toLocaleTimeString();
+  }
+
+  autoSave() {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+    }
+    this.autoSaveInterval = setInterval(() => {
       this.saveAllNotes();
-    }, time.interval * 1000); // Save every 2 seconds
+      this.displaySavedTime();
+    }, 2000);
   }
 
-  addNoteCard() {
-    const newNoteCard = new NoteCard(this.nextId++);
-    newNoteCard.renderWriter();
-    localStorage.setItem("nextId", this.nextId);
+  stopAutoSave() {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+    }
+  }
+
+  autoLoad() {
+    if (this.autoLoadInterval) {
+      clearInterval(this.autoLoadInterval);
+    }
+    this.autoLoadInterval = setInterval(() => {
+      this.loadAllNotes();
+      this.displayUpdatedTime();
+    }, 2000);
+  }
+
+  stopAutoLoad() {
+    if (this.autoLoadInterval) {
+      clearInterval(this.autoLoadInterval);
+    }
+  }
+
+  addNote() {
+    const newNote = new Note(this.nextId++);
+    newNote.renderWritePage();
+    StorageManager.saveNextIdToStorage(this.nextId);
   }
 
   saveAllNotes() {
-    document.querySelectorAll(".card").forEach((card) => {
-      const noteId = parseInt(card.dataset.noteId); // Get the correct noteId
-      const noteText = card.querySelector("input").value;
-      const note = new NoteCard(noteId);
-      note.updateText(noteText);
-      StorageManager.saveNoteToStorage(note);
+    document.querySelectorAll(".card").forEach((note) => {
+      const newNoteId = parseInt(note.dataset.noteId); // Get the correct noteId
+      const newNoteText = note.querySelector("input").value;
+      const newNote = new Note(newNoteId);
+      newNote.updateText(newNoteText);
+      StorageManager.saveNoteToStorage(newNote);
     });
   }
 
-  loadNotes() {
-    let notesExist = false;
+  //remove all notes from the DOM
+  removeAllNotes() {
+    document.querySelectorAll(".card").forEach((card) => {
+      card.remove();
+    });
+  }
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!isNaN(key)) {
-        notesExist = true;
-        break;
-      }
-    }
+  loadAllNotes() {
+    this.removeAllNotes();
 
-    if (!notesExist) {
-      console.log("No notes in the localStorage.");
-      localStorage.setItem("nextId", "0");
-      this.nextId = 0;
+    this.nextId = parseInt(localStorage.getItem("nextId")) || 0;
+
+    if (localStorage.length === 0) {
+      console.log("No notes. Skipping load.");
       return;
     }
 
-    let notes = [];
+    for (let id = 0; id < this.nextId; id++) {
+      const noteData = localStorage.getItem(id);
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!isNaN(key)) {
-        const noteData = JSON.parse(localStorage.getItem(key));
-        notes.push(noteData);
+      // If the note with the current ID exists, process it
+      if (noteData) {
+        const parsedNote = JSON.parse(noteData);
+        const loadedNote = new Note(parsedNote.id);
+        loadedNote.updateText(parsedNote.text);
+
+        const isWriterPage = document.getElementById("card-container") !== null;
+        const isReaderPage =
+          document.getElementById("read-card-container") !== null;
+
+        if (isWriterPage) {
+          loadedNote.renderWritePage();
+        } else if (isReaderPage) {
+          loadedNote.renderReadPage();
+        }
       }
     }
-    notes.sort((a, b) => a.id - b.id);
-    const isWriterPage = document.getElementById("card-container") !== null;
-    const isReaderPage =
-      document.getElementById("read-card-container") !== null;
+  }
 
-    notes.forEach((noteData) => {
-      const loadedNote = new NoteCard(noteData.id);
-      loadedNote.updateText(noteData.text);
+  displaySavedTime() {
+    const savedTimeDisplay = document.getElementById("saved-time-display");
+    const currentTime = this.getCurrentTime();
 
-      if (isWriterPage) {
-        loadedNote.renderWriter();
-      } else if (isReaderPage) {
-        loadedNote.renderReader();
-      }
-    });
+    if (savedTimeDisplay) {
+      // overwrite the saved time
+      savedTimeDisplay.innerHTML = `${messages.savedAt}${currentTime}`;
+    } else {
+      const savedTime = document.createElement("div");
+      savedTime.className = "saved-time";
+      savedTime.id = "saved-time-display";
+      savedTime.innerHTML = `<p>Saved at: ${currentTime}</p>`;
+
+      const timeContainer = document.getElementById("saved-time-container");
+      timeContainer.appendChild(savedTime);
+    }
+  }
+
+  displayUpdatedTime() {
+    const updatedTimeDisplay = document.getElementById("updated-time-display");
+    const currentTime = this.getCurrentTime();
+
+    if (updatedTimeDisplay) {
+      updatedTimeDisplay.innerHTML = `${messages.updatedAt}${currentTime}`;
+    } else {
+      const updatedTime = document.createElement("div");
+      updatedTime.className = "updated-time";
+      updatedTime.id = "updated-time-display";
+      updatedTime.innerHTML = `<p>Updated at: ${currentTime}</p>`;
+
+      const updatedTimeContainer = document.getElementById(
+        "updated-time-container"
+      );
+      updatedTimeContainer.appendChild(updatedTime);
+    }
   }
 }
 
 class StorageManager {
   static saveNoteToStorage(note) {
     localStorage.setItem(note.id, JSON.stringify(note));
-    const currentTime = StorageManager.getCurrentTime();
-    localStorage.setItem("lastSavedTime", currentTime);
-    StorageManager.displaySavedTime();
-    console.log(`Note ${note.id} saved at ${StorageManager.getCurrentTime()}`);
+  }
+
+  static saveNextIdToStorage(nextId) {
+    localStorage.setItem("nextId", nextId);
   }
 
   static removeFromStorage(id) {
@@ -124,35 +190,19 @@ class StorageManager {
     console.log(`Note ${id} removed from localStorage`);
   }
 
-  static displaySavedTime() {
-    const savedTimeDisplay = document.getElementById("saved-time-display");
-    const lastSavedTime =
-      localStorage.getItem("lastSavedTime") || StorageManager.getCurrentTime();
-
-    if (savedTimeDisplay) {
-      savedTimeDisplay.innerHTML = `Saved at: ${lastSavedTime}`;
-    } else {
-      const savedTime = document.createElement("div");
-      savedTime.className = "saved-time";
-      savedTime.id = "saved-time-display";
-      savedTime.innerHTML = `<p>Saved at: ${lastSavedTime}</p>`;
-
-      const timeContainer = document.getElementById("time-container");
-      timeContainer.appendChild(savedTime);
-    }
-  }
-
-  static getCurrentTime() {
-    return new Date().toLocaleTimeString();
+  static removeAllFromStorage() {
+    localStorage.clear();
+    localStorage.removeItem("nextId");
+    console.log("All notes removed from localStorage");
   }
 }
-class NoteCard {
+class Note {
   constructor(id) {
     this.id = id;
     this.text = "";
   }
 
-  renderWriter() {
+  renderWritePage() {
     const card = document.createElement("div");
     card.className = "card mb-4 shadow-sm";
     card.setAttribute("data-note-id", this.id);
@@ -166,10 +216,6 @@ class NoteCard {
     inputElement.type = "text";
     inputElement.placeholder = "Write your note here...";
     inputElement.value = this.text;
-    inputElement.addEventListener("input", (event) => {
-      this.updateText(event.target.value);
-      StorageManager.saveNoteToStorage(this);
-    });
 
     const buttonElement = document.createElement("button");
     buttonElement.className = "btn btn-outline-danger mt-2";
@@ -188,7 +234,7 @@ class NoteCard {
     cardContainer.appendChild(card);
   }
 
-  renderReader() {
+  renderReadPage() {
     const card = document.createElement("div");
     card.className = "card mb-4 shadow-sm";
     card.setAttribute("data-note-id", this.id);
@@ -196,35 +242,12 @@ class NoteCard {
     const noteElement = document.createElement("div");
     noteElement.className = "card-body";
     noteElement.id = `note-${this.id}`;
-
-    const textElement = document.createElement("p");
-    textElement.className = "form-control mb-3";
-    textElement.innerText = this.text;
-
-    noteElement.appendChild(textElement);
+    noteElement.innerText = this.text;
 
     card.appendChild(noteElement);
 
     const readCardContainer = document.getElementById("read-card-container");
-    if (readCardContainer) {
-      readCardContainer.appendChild(card);
-    }
-
-    const savedTimeDisplay = document.createElement("div");
-    savedTimeDisplay.className = "saved-time mt-2";
-    const updatedTimeContainer = document.getElementById(
-      "updated-time-container"
-    );
-
-    const refreshSavedTime = () => {
-      const lastSavedTime = localStorage.getItem("lastSavedTime");
-      savedTimeDisplay.textContent = `Updated at: ${lastSavedTime}`;
-    };
-
-    refreshSavedTime();
-    setInterval(refreshSavedTime, 2000);
-
-    updatedTimeContainer.appendChild(savedTimeDisplay);
+    readCardContainer.appendChild(card);
   }
 
   updateText(newText) {
@@ -234,13 +257,36 @@ class NoteCard {
   remove() {
     const card = document.querySelector(`[data-note-id="${this.id}"]`);
     if (card) {
-      card.remove();
+      card.remove(); // this only removes the note from DOM
+      StorageManager.removeFromStorage(this.id);
     }
   }
 }
 
 const appManager = new AppManager();
+
 const addButton = document.getElementById("add-btn");
 addButton.addEventListener("click", () => {
-  appManager.addNoteCard();
+  appManager.addNote();
 });
+
+// very powerful clear button
+const clearButton = document.getElementById("clear-btn");
+clearButton.addEventListener("click", () => {
+  console.log("Clearing data...");
+  appManager.stopAutoSave();
+  appManager.removeAllNotes(); // remove all from the DOM
+  StorageManager.removeAllFromStorage(); // remove all from localStorage
+  setTimeout(() => {
+    location.reload();
+  }, 2000); // Reload the page after 2 second
+});
+
+// 1- open the writer.html and reader.html in two different tabs of same browser.
+// Would the reader.html have access to the content stored in the local storage by the writer.html?
+// Yes, the reader.html has access to the content stored in the local storage by the writer.html.
+
+// 2- open the writer.html and reader.html in two different tabs of two different browsers
+// ( e.g. one in chrome, one in Firefox) . Would the reader.html have access to the content
+// stored in the local storage by the writer.html?
+// No, the reader.html won't have access to the content stored in the local storage by the writer.html.
